@@ -98,6 +98,9 @@ for CONTAINERD_VERSION in ${CONTAINERD_VERSIONS}; do
     echo "  - containerd version ${CONTAINERD_VERSION}" >> ${VHD_LOGS_FILEPATH}
 done
 
+installNodeProblemDetector
+echo "  - node problem detector" >> ${VHD_LOGS_FILEPATH}
+
 installImg
 echo "  - img" >> ${VHD_LOGS_FILEPATH}
 

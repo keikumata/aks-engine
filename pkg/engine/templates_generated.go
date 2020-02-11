@@ -37270,6 +37270,7 @@ CNI_DOWNLOADS_DIR="/opt/cni/downloads"
 CONTAINERD_DOWNLOADS_DIR="/opt/containerd/downloads"
 K8S_DOWNLOADS_DIR="/opt/kubernetes/downloads"
 APMZ_DOWNLOADS_DIR="/opt/apmz/downloads"
+NPD_DOWNLOADS_DIR="/opt/node-problem-detector/downloads"
 UBUNTU_RELEASE=$(lsb_release -r -s)
 
 removeEtcd() {
@@ -37448,6 +37449,33 @@ downloadContainerd() {
     mkdir -p $CONTAINERD_DOWNLOADS_DIR
     CONTAINERD_TGZ_TMP=$(echo ${CONTAINERD_DOWNLOAD_URL} | cut -d "/" -f 5)
     retrycmd_get_tarball 120 5 "$CONTAINERD_DOWNLOADS_DIR/${CONTAINERD_TGZ_TMP}" ${CONTAINERD_DOWNLOAD_URL} || exit $ERR_CONTAINERD_DOWNLOAD_TIMEOUT
+}
+
+installNodeProblemDetector() {
+    local version="v0.8.0"
+    local npd_url="https://upstreamartifacts.blob.core.windows.net/node-problem-detector/$version/binaries/node-problem-detector.tar.gz"
+    local npd_binpath="/usr/local/bin/node-problem-detector"
+    local npd_configpath="/usr/local/etc/node-problem-detector"
+    if [[ -f "$npd_binpath" ]]; then
+        installed_version=$($npd_binpath --version | cut -d'-' -f1)
+        if [[ "$version" == "$installed_version" ]]; then
+            return
+        fi
+    fi
+    install_dir="$NPD_DOWNLOADS_DIR/$version"
+    download_path="$install_dir/node-problem-detector.tar.gz"
+    mkdir -p "$install_dir"
+    retrycmd_get_tarball 120 5 "$download_path" "$npd_url"
+    tar -xvf "$download_path" -C "$install_dir"
+    bin_path="$install_dir/bin/node-problem-detector"
+    chmod +x "$bin_path"
+    ln -Ffs "$bin_path" "$npd_binpath" # symlink node-problem-detector into /usr/local/bin/node-problem-detector
+    config_path="$install_dir/config"
+    cp -r "$config_path" "$npd_configpath" # Copy over NPD specific configs
+    cp "$install_dir/config/systemd/node-problem-detector-metric-only.service" "/etc/systemd/system/node-problem-detector.service"
+    cp -r "$install_dir/config/systemd/node-problem-detector.service.d" "/etc/systemd/system/"
+
+    echo "Successfully installed node problem detector."
 }
 
 ensureAPMZ() {
@@ -37717,6 +37745,10 @@ fi
 
 if [[ $OS == $UBUNTU_OS_NAME ]]; then
     time_metric "EnsureAuditD" ensureAuditD
+fi
+
+if [[ "$FULL_INSTALL_REQUIRED" = "true" ]]; then
+    time_metric "InstallNodeProblemDetector" installNodeProblemDetector
 fi
 
 {{- if not HasCoreOS}}
